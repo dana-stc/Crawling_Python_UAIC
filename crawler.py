@@ -1,6 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
+import smtplib  # for email sending function
+from email.message import EmailMessage
 import time
 import logging
 
@@ -19,44 +21,33 @@ def connectToMongoDB():
     return collection
 
 
-def saveInitialPage():
-    logging.info("Calling function saveInitialPage")
+def saveInitialPage(url, name):
+    logging.info("Saving a new page to the database")
     collection = connectToMongoDB()
 
     headers = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Max-Age': '3600',
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0'
     }
-    url = "https://www.ziaruldeiasi.ro/stiri/local"
     req = requests.get(url, headers)
     soup = BeautifulSoup(req.content, 'html.parser')
-    # print(soup.prettify())
 
     website_html = {
-        "name": "Ziarul de Iasi",
+        "name": name,
         "HTML": soup.prettify(),
         "newHTML": ''
     }
     # Insert Data
-    rec_id1 = collection.insert_one(website_html)
+    collection.insert_one(website_html)
     logging.info("Row inserted successfully")
 
 
-def saveUpdatedHTML(name):
-    logging.info("Started to look for updates on your page...")
+def saveUpdatedHTML(url, name):
+    logging.info("Updating newHTML with the latest version...")
     collection = connectToMongoDB()
 
     headers = {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Max-Age': '3600',
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0'
     }
-    url = "https://www.ziaruldeiasi.ro/stiri/local"
     req = requests.get(url, headers)
     soup = BeautifulSoup(req.content, 'html.parser')
 
@@ -66,7 +57,7 @@ def saveUpdatedHTML(name):
 
 
 def updateInitialPage(name):
-    logging.info("Calling function updateInitialPage")
+    logging.info("Started updating initial page with its latest version ...")
     collection = connectToMongoDB()
 
     for doc in list(collection.find({"name": name})):
@@ -91,13 +82,47 @@ def verifyForUpdates(name):
             print("different")
 
 
-def index(name):
+def index(url, name):
+    logging.info("Started to look for updates on your page...")
     while True:
-        saveUpdatedHTML(name)
+        saveUpdatedHTML(url, name)
         time.sleep(5)
         print('5 seconds passed')
         verifyForUpdates(name)
         updateInitialPage(name)
 
 
-index('Ziarul de Iasi')
+def startTheApp():
+    print('Welcome to the most awesome crawler!')
+    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+    print('Please select an action you want to perform:')
+    print('1. Create a new alert')
+    print('2. Update an existing alert')
+    print('3. Delete an existing alert')
+    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+    print('Please enter the name of the page you want to be notified about!')
+    print('-------------------------------------------------------')
+    print('Please enter the link of the page you want to be notified about!')
+    print('-------------------------------------------------------')
+    print('Please enter your email: ')
+
+
+# saveInitialPage('https://www.instagram.com/ioanastoica/', 'Insta')
+index('https://www.ziaruldeiasi.ro/stiri/local', 'Ziarul de Iasi')
+
+
+def sendEmail():
+    senderEmail = 'ioanadana97@gmail.com'
+    subject = 'Awesome Crawler'
+    receiverEmail = 'ioanadana97@gmail.com'
+    password = 'nlnxuhhbckwnpxqi'
+    message = 'Subject:{}\n\nHey, this was send using Python.'.format(subject)
+    # Send the message via our own SMTP server.
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.starttls()
+    s.login(senderEmail, password)
+    print("Login success")
+    s.sendmail(senderEmail, receiverEmail, message)
+    print("Email has been send to " + receiverEmail)
+
+# sendEmail()
