@@ -5,6 +5,7 @@ import smtplib  # for email sending function
 from email.message import EmailMessage
 import time
 import logging
+import constants
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
@@ -108,16 +109,15 @@ def startTheApp():
 
 
 # saveInitialPage('https://www.instagram.com/ioanastoica/', 'Insta')
-index('https://www.ziaruldeiasi.ro/stiri/local', 'Ziarul de Iasi')
+# index('https://www.ziaruldeiasi.ro/stiri/local', 'Ziarul de Iasi')
 
 
-def sendEmail():
-    senderEmail = 'ioanadana97@gmail.com'
+def sendEmail(email):
+    senderEmail = constants.EMAIL
+    password = constants.PASS
+    receiverEmail = email
     subject = 'Awesome Crawler'
-    receiverEmail = 'ioanadana97@gmail.com'
-    password = 'nlnxuhhbckwnpxqi'
-    message = 'Subject:{}\n\nHey, this was send using Python.'.format(subject)
-    # Send the message via our own SMTP server.
+    message = 'Subject:{}\n\nThe page has changed!'.format(subject)
     s = smtplib.SMTP('smtp.gmail.com', 587)
     s.starttls()
     s.login(senderEmail, password)
@@ -125,4 +125,4 @@ def sendEmail():
     s.sendmail(senderEmail, receiverEmail, message)
     print("Email has been send to " + receiverEmail)
 
-# sendEmail()
+# sendEmail('ioanadana97@gmail.com')
