@@ -124,5 +124,3 @@ def sendEmail(email):
     print("Login success")
     s.sendmail(senderEmail, receiverEmail, message)
     print("Email has been send to " + receiverEmail)
-
-# sendEmail('ioanadana97@gmail.com')
