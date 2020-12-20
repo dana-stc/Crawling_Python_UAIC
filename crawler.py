@@ -1,11 +1,10 @@
+import constants
 import requests
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
-import smtplib  # for email sending function
-from email.message import EmailMessage
+import smtplib
 import time
 import logging
-import constants
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
@@ -26,11 +25,17 @@ def saveInitialPage(url, name):
     logging.info("Saving a new page to the database")
     collection = connectToMongoDB()
 
+    UNALLOWED_TAGS = ['script']
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0'
     }
     req = requests.get(url, headers)
     soup = BeautifulSoup(req.content, 'html.parser')
+    # remove script tags
+    for tag in soup.findAll(True):
+        if tag.name in UNALLOWED_TAGS:
+            tag.hidden = True
+    soup.renderContents()
 
     website_html = {
         "name": name,
@@ -46,11 +51,17 @@ def saveUpdatedHTML(url, name):
     logging.info("Updating newHTML with the latest version...")
     collection = connectToMongoDB()
 
+    UNALLOWED_TAGS = ['script']
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0'
     }
     req = requests.get(url, headers)
     soup = BeautifulSoup(req.content, 'html.parser')
+    # remove script tags
+    for tag in soup.findAll(True):
+        if tag.name in UNALLOWED_TAGS:
+            tag.hidden = True
+    soup.renderContents()
 
     for doc1 in collection.find():
         collection.update_one({"name": name}, {"$set": {"newHTML": soup.prettify()}})
@@ -93,6 +104,21 @@ def index(url, name):
         updateInitialPage(name)
 
 
+def sendEmail(email):
+    logging.info("Started to prepare for sending the email...")
+    senderEmail = constants.EMAIL
+    password = constants.PASS
+    receiverEmail = email
+    subject = 'Awesome Crawler'
+    message = 'Subject:{}\n\nThe page has changed!'.format(subject)
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.starttls()
+    s.login(senderEmail, password)
+    logging.info("Login success")
+    s.sendmail(senderEmail, receiverEmail, message)
+    logging.info("Email has been send to " + receiverEmail)
+
+
 def startTheApp():
     print('Welcome to the most awesome crawler!')
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
@@ -109,18 +135,5 @@ def startTheApp():
 
 
 # saveInitialPage('https://www.instagram.com/ioanastoica/', 'Insta')
-# index('https://www.ziaruldeiasi.ro/stiri/local', 'Ziarul de Iasi')
-
-
-def sendEmail(email):
-    senderEmail = constants.EMAIL
-    password = constants.PASS
-    receiverEmail = email
-    subject = 'Awesome Crawler'
-    message = 'Subject:{}\n\nThe page has changed!'.format(subject)
-    s = smtplib.SMTP('smtp.gmail.com', 587)
-    s.starttls()
-    s.login(senderEmail, password)
-    print("Login success")
-    s.sendmail(senderEmail, receiverEmail, message)
-    print("Email has been send to " + receiverEmail)
+index('https://www.ziaruldeiasi.ro/stiri/local', 'Ziarul de Iasi')
+# sendEmail('ioanadana97@gmail.com')
