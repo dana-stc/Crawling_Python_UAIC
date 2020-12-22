@@ -80,7 +80,7 @@ def updateInitialPage(name):
     logging.info("Updated old HTML with newHTML")
 
 
-def verifyForUpdates(name):
+def verifyForUpdates(name, rEmail):
     logging.info("Started verifying initial HTML with newHTML ...")
     collection = connectToMongoDB()
 
@@ -88,19 +88,20 @@ def verifyForUpdates(name):
     for doc in documents:
         HTML = doc["HTML"]
         updatedHTML = doc["newHTML"]
-        if HTML == updatedHTML:
-            print("same page")
+        if HTML != updatedHTML:
+            print("Same")
         else:
-            print("different")
+            print("The page has changed")
+            sendEmail(rEmail)
 
 
-def index(url, name):
+def run(url, name, rEmail):
     logging.info("Started to look for updates on your page...")
     while True:
         saveUpdatedHTML(url, name)
         time.sleep(5)
         print('5 seconds passed')
-        verifyForUpdates(name)
+        verifyForUpdates(name, rEmail)
         updateInitialPage(name)
 
 
@@ -110,7 +111,7 @@ def sendEmail(email):
     password = constants.PASS
     receiverEmail = email
     subject = 'Awesome Crawler'
-    message = 'Subject:{}\n\nThe page has changed!'.format(subject)
+    message = 'Subject:{}\n\nPagina web a fost modificata.'.format(subject)
     s = smtplib.SMTP('smtp.gmail.com', 587)
     s.starttls()
     s.login(senderEmail, password)
@@ -120,20 +121,34 @@ def sendEmail(email):
 
 
 def startTheApp():
+    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     print('Welcome to the most awesome crawler!')
+    option = principalMenu()
+    if option == '1':
+        createAlert()
+    elif option == '2':
+        updateAlert()
+    elif option == '3':
+        deleteAlert()
+    else:
+        print('Invalid option!')
+        startTheApp()
+
+
+def principalMenu():
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     print('Please select an action you want to perform:')
     print('1. Create a new alert')
     print('2. Update an existing alert')
     print('3. Delete an existing alert')
+    option = input('Enter the number of your option here: ')
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-    print('Please enter the name of the page you want to be notified about!')
-    print('-------------------------------------------------------')
-    print('Please enter the link of the page you want to be notified about!')
-    print('-------------------------------------------------------')
-    print('Please enter your email: ')
+    return option
 
 
-# saveInitialPage('https://www.instagram.com/ioanastoica/', 'Insta')
-index('https://www.ziaruldeiasi.ro/stiri/local', 'Ziarul de Iasi')
-# sendEmail('ioanadana97@gmail.com')
+def createAlert():
+    name = input('Please enter the name of the page you want to be notified about: ')
+    url = input('Please enter the link of the page you want to be notified about: ')
+    mail = input('Please enter your email: ')
+    saveInitialPage(url, name)
+    run(url, name, mail)
