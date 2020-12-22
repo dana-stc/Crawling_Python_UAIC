@@ -25,7 +25,7 @@ def saveInitialPage(url, name):
     logging.info("Saving a new page to the database")
     collection = connectToMongoDB()
 
-    UNALLOWED_TAGS = ['script']
+    UNALLOWED_TAGS = ['script', 'head']
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0'
     }
@@ -34,7 +34,7 @@ def saveInitialPage(url, name):
     # remove script tags
     for tag in soup.findAll(True):
         if tag.name in UNALLOWED_TAGS:
-            tag.hidden = True
+            tag.extract()
     soup.renderContents()
 
     website_html = {
@@ -92,7 +92,7 @@ def verifyForUpdates(name, rEmail):
             print("Same")
         else:
             print("The page has changed")
-            sendEmail(rEmail)
+            sendEmail(rEmail, name)
 
 
 def run(url, name, rEmail):
@@ -105,19 +105,26 @@ def run(url, name, rEmail):
         updateInitialPage(name)
 
 
-def sendEmail(email):
+def sendEmail(email, name):
     logging.info("Started to prepare for sending the email...")
     senderEmail = constants.EMAIL
     password = constants.PASS
     receiverEmail = email
     subject = 'Awesome Crawler'
-    message = 'Subject:{}\n\nPagina web a fost modificata.'.format(subject)
+    message = 'Subject:{}\n\nPagina web ' + name + ' a fost modificata.'.format(subject)
     s = smtplib.SMTP('smtp.gmail.com', 587)
     s.starttls()
     s.login(senderEmail, password)
     logging.info("Login success")
     s.sendmail(senderEmail, receiverEmail, message)
     logging.info("Email has been send to " + receiverEmail)
+
+
+def deleteSavedPage(name):
+    logging.info("Called function deletedSavedPage ...")
+    collection = connectToMongoDB()
+    myquery = {"name": name}
+    collection.delete_one(myquery)
 
 
 def startTheApp():
@@ -152,3 +159,16 @@ def createAlert():
     mail = input('Please enter your email: ')
     saveInitialPage(url, name)
     run(url, name, mail)
+    startTheApp()
+
+
+def deleteAlert():
+    name = input('Please enter the name of the alert you want to delete: ')
+    deleteSavedPage(name)
+    startTheApp()
+
+
+startTheApp()
+
+# update and delete functionalities
+# name of the changed page in the email
