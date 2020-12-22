@@ -127,6 +127,21 @@ def deleteSavedPage(name):
     collection.delete_one(myquery)
 
 
+def updateSavedPage(name, newName, newUrl):
+    logging.info("Called function updateSavedPage ...")
+    collection = connectToMongoDB()
+    if newName != '':
+        for doc in list(collection.find({"name": name})):
+            collection.update_one({"name": name}, {"$set": {"name": newName}})
+    elif newUrl != '':
+        for doc in list(collection.find({"name": name})):
+            collection.update_one({"name": name}, {"$set": {"HTML": newUrl}})
+    else:
+        for doc in list(collection.find({"name": name})):
+            collection.update_one({"name": name}, {"$set": {"name": newName, "HTML": newUrl}})
+    logging.info("Updated " + name)
+
+
 def startTheApp():
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     print('Welcome to the most awesome crawler!')
@@ -154,6 +169,7 @@ def principalMenu():
 
 
 def createAlert():
+    print('--> Create a new alert <--')
     name = input('Please enter the name of the page you want to be notified about: ')
     url = input('Please enter the link of the page you want to be notified about: ')
     mail = input('Please enter your email: ')
@@ -162,7 +178,17 @@ def createAlert():
     startTheApp()
 
 
+def updateAlert():
+    print('--> Update an existing alert <--')
+    name = input('Please enter the name of the alert you want to change: ')
+    newName = input('Please enter the the new name: ')
+    newUrl = input('Please enter the the new url: ')
+    updateSavedPage(name, newName, newUrl)
+    startTheApp()
+
+
 def deleteAlert():
+    print('--> Delete an existing alert <--')
     name = input('Please enter the name of the alert you want to delete: ')
     deleteSavedPage(name)
     startTheApp()
