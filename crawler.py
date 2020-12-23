@@ -1,3 +1,5 @@
+import datetime
+
 import constants
 import requests
 from bs4 import BeautifulSoup
@@ -21,7 +23,7 @@ def connectToMongoDB():
     return collection
 
 
-def saveInitialPage(url, name):
+def saveInitialPage(url, name, dbEmail):
     logging.info("Saving a new page to the database")
     collection = connectToMongoDB()
 
@@ -40,7 +42,9 @@ def saveInitialPage(url, name):
     website_html = {
         "name": name,
         "HTML": soup.prettify(),
-        "newHTML": ''
+        "newHTML": '',
+        "email": dbEmail,
+        "url": url
     }
     # Insert Data
     collection.insert_one(website_html)
@@ -97,21 +101,27 @@ def verifyForUpdates(name, rEmail):
 
 def run(url, name, rEmail):
     logging.info("Started to look for updates on your page...")
-    while True:
-        saveUpdatedHTML(url, name)
-        time.sleep(5)
-        print('5 seconds passed')
-        verifyForUpdates(name, rEmail)
-        updateInitialPage(name)
+    # while True:
+    saveUpdatedHTML(url, name)
+    time.sleep(5)
+    print('5 seconds passed')
+    verifyForUpdates(name, rEmail)
+    updateInitialPage(name)
+    startTheApp()
 
 
 def sendEmail(email, name):
     logging.info("Started to prepare for sending the email...")
+    t = time.localtime()
+    d = datetime.date.today()
+
     senderEmail = constants.EMAIL
     password = constants.PASS
     receiverEmail = email
     subject = 'Awesome Crawler'
-    message = 'Subject:{}\n\nPagina web ' + name + ' a fost modificata.'.format(subject)
+    current_time = time.strftime("%H:%M:%S", t)
+    text = 'Pagina web ' + name + ' a fost modificata pe ' + d.strftime('%d-%m-%Y') + ' la ora ' + current_time
+    message = 'Subject: {}\n\n{}'.format(subject, text)
     s = smtplib.SMTP('smtp.gmail.com', 587)
     s.starttls()
     s.login(senderEmail, password)
@@ -120,38 +130,46 @@ def sendEmail(email, name):
     logging.info("Email has been send to " + receiverEmail)
 
 
-def deleteSavedPage(name):
+def getPages():
+    pass
+
+
+def deleteSavedPage(name, dbEmail):
     logging.info("Called function deletedSavedPage ...")
     collection = connectToMongoDB()
-    myquery = {"name": name}
+    myquery = {"name": name, "email": dbEmail}
     collection.delete_one(myquery)
 
 
-def updateSavedPage(name, newName, newUrl):
+def updateSavedPage(name, newName, newUrl, dbEmail):
     logging.info("Called function updateSavedPage ...")
     collection = connectToMongoDB()
     if newName != '':
-        for doc in list(collection.find({"name": name})):
-            collection.update_one({"name": name}, {"$set": {"name": newName}})
+        for doc in list(collection.find({"name": name, "email": dbEmail})):
+            collection.update_one({"name": name, "email": dbEmail}, {"$set": {"name": newName}})
     elif newUrl != '':
-        for doc in list(collection.find({"name": name})):
-            collection.update_one({"name": name}, {"$set": {"HTML": newUrl}})
+        for doc in list(collection.find({"name": name, "email": dbEmail})):
+            collection.update_one({"name": name, "email": dbEmail}, {"$set": {"HTML": newUrl}})
     else:
-        for doc in list(collection.find({"name": name})):
-            collection.update_one({"name": name}, {"$set": {"name": newName, "HTML": newUrl}})
+        for doc in list(collection.find({"name": name, "email": dbEmail})):
+            collection.update_one({"name": name, "email": dbEmail}, {"$set": {"name": newName, "HTML": newUrl}})
     logging.info("Updated " + name)
 
 
 def startTheApp():
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     print('Welcome to the most awesome crawler!')
+    print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
+    mail = input('Please enter your email: ')
     option = principalMenu()
-    if option == '1':
-        createAlert()
+    if option == '0':
+        sendAlert(mail)
+    elif option == '1':
+        createAlert(mail)
     elif option == '2':
-        updateAlert()
+        updateAlert(mail)
     elif option == '3':
-        deleteAlert()
+        deleteAlert(mail)
     else:
         print('Invalid option!')
         startTheApp()
@@ -160,6 +178,7 @@ def startTheApp():
 def principalMenu():
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     print('Please select an action you want to perform:')
+    print('0. Start sending alerts')
     print('1. Create a new alert')
     print('2. Update an existing alert')
     print('3. Delete an existing alert')
@@ -168,33 +187,42 @@ def principalMenu():
     return option
 
 
-def createAlert():
+def sendAlert(mail):
+    print('--> Start sending alerts <--')
+    collection = connectToMongoDB()
+    for doc in list(collection.find({"email": mail})):
+        if doc["email"] is None:
+            startTheApp()
+        else:
+            url = doc["url"]
+            name = doc["name"]
+    arr = collection.find({}, {"email": mail})
+    for doc in arr:
+        run(url, name, mail)
+
+
+def createAlert(mail):
     print('--> Create a new alert <--')
     name = input('Please enter the name of the page you want to be notified about: ')
     url = input('Please enter the link of the page you want to be notified about: ')
-    mail = input('Please enter your email: ')
-    saveInitialPage(url, name)
+    saveInitialPage(url, name, mail)
     run(url, name, mail)
-    startTheApp()
 
 
-def updateAlert():
+def updateAlert(mail):
     print('--> Update an existing alert <--')
     name = input('Please enter the name of the alert you want to change: ')
     newName = input('Please enter the the new name: ')
     newUrl = input('Please enter the the new url: ')
-    updateSavedPage(name, newName, newUrl)
+    updateSavedPage(name, newName, newUrl, mail)
     startTheApp()
 
 
-def deleteAlert():
+def deleteAlert(mail):
     print('--> Delete an existing alert <--')
     name = input('Please enter the name of the alert you want to delete: ')
-    deleteSavedPage(name)
+    deleteSavedPage(name, mail)
     startTheApp()
 
 
 startTheApp()
-
-# update and delete functionalities
-# name of the changed page in the email
