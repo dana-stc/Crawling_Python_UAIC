@@ -27,21 +27,15 @@ def saveInitialPage(url, name, dbEmail):
     logging.info("Saving a new page to the database")
     collection = connectToMongoDB()
 
-    UNALLOWED_TAGS = ['script', 'head']
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0'
     }
     req = requests.get(url, headers)
     soup = BeautifulSoup(req.content, 'html.parser')
-    # remove script tags
-    for tag in soup.findAll(True):
-        if tag.name in UNALLOWED_TAGS:
-            tag.extract()
-    soup.renderContents()
 
     website_html = {
         "name": name,
-        "HTML": soup.prettify(),
+        "HTML": soup.get_text(),
         "newHTML": '',
         "email": dbEmail,
         "url": url
@@ -55,20 +49,14 @@ def saveUpdatedHTML(url, name):
     logging.info("Updating newHTML with the latest version...")
     collection = connectToMongoDB()
 
-    UNALLOWED_TAGS = ['script']
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0'
     }
     req = requests.get(url, headers)
     soup = BeautifulSoup(req.content, 'html.parser')
-    # remove script tags
-    for tag in soup.findAll(True):
-        if tag.name in UNALLOWED_TAGS:
-            tag.hidden = True
-    soup.renderContents()
 
-    for doc1 in collection.find():
-        collection.update_one({"name": name}, {"$set": {"newHTML": soup.prettify()}})
+    # for doc in collection.find({"name": name}):
+    collection.update_one({"name": name}, {"$set": {"newHTML": soup.get_text()}})
     logging.info("newHTML row updated successfully")
 
 
@@ -76,12 +64,9 @@ def updateInitialPage(name):
     logging.info("Started updating initial page with its latest version ...")
     collection = connectToMongoDB()
 
-    for doc in list(collection.find({"name": name})):
-        newHTML = doc["newHTML"]
-
-    for doc1 in collection.find():
-        collection.update_one({"name": name}, {"$set": {"HTML": newHTML}})
-    logging.info("Updated old HTML with newHTML")
+    for doc in collection.find({"name": name}):
+        collection.update_one({"name": name}, {"$set": {"HTML": doc["newHTML"]}})
+    logging.info("HTML row updated successfully")
 
 
 def verifyForUpdates(name, rEmail):
@@ -90,9 +75,9 @@ def verifyForUpdates(name, rEmail):
 
     documents = list(collection.find({"name": name}))
     for doc in documents:
-        HTML = doc["HTML"]
+        html = doc["HTML"]
         updatedHTML = doc["newHTML"]
-        if HTML != updatedHTML:
+        if html == updatedHTML:
             print("Same")
         else:
             print("The page has changed")
@@ -107,7 +92,6 @@ def run(url, name, rEmail):
     print('5 seconds passed')
     verifyForUpdates(name, rEmail)
     updateInitialPage(name)
-    startTheApp()
 
 
 def sendEmail(email, name):
@@ -128,10 +112,6 @@ def sendEmail(email, name):
     logging.info("Login success")
     s.sendmail(senderEmail, receiverEmail, message)
     logging.info("Email has been send to " + receiverEmail)
-
-
-def getPages():
-    pass
 
 
 def deleteSavedPage(name, dbEmail):
@@ -190,15 +170,11 @@ def principalMenu():
 def sendAlert(mail):
     print('--> Start sending alerts <--')
     collection = connectToMongoDB()
-    for doc in list(collection.find({"email": mail})):
-        if doc["email"] is None:
-            startTheApp()
-        else:
+    while True:
+        for doc in list(collection.find({"email": mail})):
             url = doc["url"]
             name = doc["name"]
-    arr = collection.find({}, {"email": mail})
-    for doc in arr:
-        run(url, name, mail)
+            run(url, name, mail)
 
 
 def createAlert(mail):
@@ -206,7 +182,7 @@ def createAlert(mail):
     name = input('Please enter the name of the page you want to be notified about: ')
     url = input('Please enter the link of the page you want to be notified about: ')
     saveInitialPage(url, name, mail)
-    run(url, name, mail)
+    startTheApp()
 
 
 def updateAlert(mail):
