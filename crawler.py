@@ -1,4 +1,5 @@
 import datetime
+import re
 
 import constants
 import requests
@@ -15,7 +16,6 @@ def connectToMongoDB():
     try:
         client = MongoClient(
             'mongodb+srv://ioana:ioana@cluster0.peu1n.mongodb.net/pythonUAIC?retryWrites=true&w=majority')
-        logging.info("Connected successfully")
     except:
         logging.error("Could not connect to MongoDB")
     db = client.pythonUAIC
@@ -23,6 +23,7 @@ def connectToMongoDB():
     return collection
 
 
+# ----------- Create new page in db; populate HTML field; newHTML initial is empty -----------
 def saveInitialPage(url, name, dbEmail):
     logging.info("Saving a new page to the database")
     collection = connectToMongoDB()
@@ -42,9 +43,9 @@ def saveInitialPage(url, name, dbEmail):
     }
     # Insert Data
     collection.insert_one(website_html)
-    logging.info("Row inserted successfully")
 
 
+# ----------- Take the latest changes in newHTML -----------
 def saveUpdatedHTML(url, name):
     logging.info("Updating newHTML with the latest version...")
     collection = connectToMongoDB()
@@ -57,16 +58,15 @@ def saveUpdatedHTML(url, name):
 
     # for doc in collection.find({"name": name}):
     collection.update_one({"name": name}, {"$set": {"newHTML": soup.get_text()}})
-    logging.info("newHTML row updated successfully")
 
 
+# ----------- Update HTML field with newHTML field AFTER verifying them
 def updateInitialPage(name):
     logging.info("Started updating initial page with its latest version ...")
     collection = connectToMongoDB()
 
     for doc in collection.find({"name": name}):
         collection.update_one({"name": name}, {"$set": {"HTML": doc["newHTML"]}})
-    logging.info("HTML row updated successfully")
 
 
 def verifyForUpdates(name, rEmail):
@@ -86,7 +86,6 @@ def verifyForUpdates(name, rEmail):
 
 def run(url, name, rEmail):
     logging.info("Started to look for updates on your page...")
-    # while True:
     saveUpdatedHTML(url, name)
     time.sleep(5)
     print('5 seconds passed')
@@ -114,6 +113,7 @@ def sendEmail(email, name):
     logging.info("Email has been send to " + receiverEmail)
 
 
+# ----------- DELETE -----------
 def deleteSavedPage(name, dbEmail):
     logging.info("Called function deletedSavedPage ...")
     collection = connectToMongoDB()
@@ -121,19 +121,33 @@ def deleteSavedPage(name, dbEmail):
     collection.delete_one(myquery)
 
 
+# ----------- UPDATE -----------
 def updateSavedPage(name, newName, newUrl, dbEmail):
     logging.info("Called function updateSavedPage ...")
     collection = connectToMongoDB()
-    if newName != '':
+    if newName != '' and newUrl != '':
+        for doc in list(collection.find({"name": name, "email": dbEmail})):
+            collection.update_one({"name": name, "email": dbEmail}, {"$set": {"name": newName, "url": newUrl}})
+            updateAuxiliary(newUrl, name)
+    elif newName != '':
         for doc in list(collection.find({"name": name, "email": dbEmail})):
             collection.update_one({"name": name, "email": dbEmail}, {"$set": {"name": newName}})
     elif newUrl != '':
         for doc in list(collection.find({"name": name, "email": dbEmail})):
-            collection.update_one({"name": name, "email": dbEmail}, {"$set": {"HTML": newUrl}})
-    else:
-        for doc in list(collection.find({"name": name, "email": dbEmail})):
-            collection.update_one({"name": name, "email": dbEmail}, {"$set": {"name": newName, "HTML": newUrl}})
-    logging.info("Updated " + name)
+            collection.update_one({"name": name, "email": dbEmail}, {"$set": {"url": newUrl}})
+            updateAuxiliary(newUrl, name)
+
+
+# ----------- auxiliary method for update -----------
+def updateAuxiliary(url, name):
+    logging.info("Updating newHTML with the html of the new inserted link...")
+    collection = connectToMongoDB()
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0'
+    }
+    req = requests.get(url, headers)
+    soup = BeautifulSoup(req.content, 'html.parser')
+    collection.update_one({"name": name}, {"$set": {"HTML": soup.get_text()}})
 
 
 def startTheApp():
@@ -141,17 +155,22 @@ def startTheApp():
     print('Welcome to the most awesome crawler!')
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     mail = input('Please enter your email: ')
-    option = principalMenu()
-    if option == '0':
-        sendAlert(mail)
-    elif option == '1':
-        createAlert(mail)
-    elif option == '2':
-        updateAlert(mail)
-    elif option == '3':
-        deleteAlert(mail)
+    regex = '^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$'
+    if re.search(regex, mail):
+        option = principalMenu()
+        if option == '0':
+            sendAlert(mail)
+        elif option == '1':
+            createAlert(mail)
+        elif option == '2':
+            updateAlert(mail)
+        elif option == '3':
+            deleteAlert(mail)
+        else:
+            print('Invalid option!')
+            startTheApp()
     else:
-        print('Invalid option!')
+        print("Invalid Email")
         startTheApp()
 
 
@@ -186,19 +205,31 @@ def createAlert(mail):
 
 
 def updateAlert(mail):
+    collection = connectToMongoDB()
     print('--> Update an existing alert <--')
     name = input('Please enter the name of the alert you want to change: ')
-    newName = input('Please enter the the new name: ')
-    newUrl = input('Please enter the the new url: ')
-    updateSavedPage(name, newName, newUrl, mail)
+    exists = collection.find({"name": name})
+    if len(list(exists)) == 0:
+        print("The name of the page does not exist. Please retry!")
+        startTheApp()
+    else:
+        newName = input('Please enter the new name: ')
+        newUrl = input('Please enter the new url: ')
+        updateSavedPage(name, newName, newUrl, mail)
     startTheApp()
 
 
 def deleteAlert(mail):
+    collection = connectToMongoDB()
     print('--> Delete an existing alert <--')
     name = input('Please enter the name of the alert you want to delete: ')
-    deleteSavedPage(name, mail)
-    startTheApp()
+    exists = collection.find({"name": name})
+    if len(list(exists)) == 0:
+        print("The name of the page does not exist. Please retry!")
+        startTheApp()
+    else:
+        deleteSavedPage(name, mail)
+        startTheApp()
 
 
 startTheApp()
