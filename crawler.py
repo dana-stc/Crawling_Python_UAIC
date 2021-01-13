@@ -11,6 +11,8 @@ import logging
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
+loggedInMail = None
+
 
 def connectToMongoDB():
     try:
@@ -127,8 +129,8 @@ def updateSavedPage(name, newName, newUrl, dbEmail):
     collection = connectToMongoDB()
     if newName != '' and newUrl != '':
         for doc in list(collection.find({"name": name, "email": dbEmail})):
-            collection.update_one({"name": name, "email": dbEmail}, {"$set": {"name": newName, "url": newUrl}})
-            updateAuxiliary(newUrl, name)
+            collection.update({"name": name, "email": dbEmail}, {"$set": {"name": newName, "url": newUrl}})
+            updateAuxiliary(newUrl, newName)
     elif newName != '':
         for doc in list(collection.find({"name": name, "email": dbEmail})):
             collection.update_one({"name": name, "email": dbEmail}, {"$set": {"name": newName}})
@@ -154,23 +156,30 @@ def startTheApp():
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     print('Welcome to the most awesome crawler!')
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-    mail = input('Please enter your email: ')
+    global loggedInMail
+    if loggedInMail is None:
+        loggedInMail = input('Please enter your email: ')
+
     regex = '^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w{2,3}$'
-    if re.search(regex, mail):
+    if re.search(regex, loggedInMail):
         option = principalMenu()
         if option == '0':
-            sendAlert(mail)
+            sendAlert(loggedInMail)
         elif option == '1':
-            createAlert(mail)
+            createAlert(loggedInMail)
         elif option == '2':
-            updateAlert(mail)
+            updateAlert(loggedInMail)
         elif option == '3':
-            deleteAlert(mail)
+            deleteAlert(loggedInMail)
+        elif option == '4':
+            print('--> Exit the app <--')
+            exit()
         else:
             print('Invalid option!')
             startTheApp()
     else:
         print("Invalid Email")
+        loggedInMail = None
         startTheApp()
 
 
@@ -181,6 +190,7 @@ def principalMenu():
     print('1. Create a new alert')
     print('2. Update an existing alert')
     print('3. Delete an existing alert')
+    print('4. Exit the app')
     option = input('Enter the number of your option here: ')
     print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     return option
